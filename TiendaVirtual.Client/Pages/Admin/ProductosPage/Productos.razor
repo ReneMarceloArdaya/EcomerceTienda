@@ -1,0 +1,21 @@
+﻿@page "/admin/productos"
+@layout AdminLayout
+@using TiendaVirtual.Client.Pages.Admin.ProductosPage.Components
+
+
+<RadzenTabs TabPosition="@tabPosition" RenderMode="TabRenderMode.Client" >
+    <Tabs>
+        <RadzenTabsItem Text="Dasboard">
+            <InventoryDashboard />
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Administracion">
+            <CrudProductos />
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+
+@code{
+    TabPosition tabPosition = TabPosition.Top;
+
+}

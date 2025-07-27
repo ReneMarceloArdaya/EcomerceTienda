@@ -1,0 +1,421 @@
+﻿@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@using Models
+@using System.Text.Json
+
+
+<RadzenCard Variant="Variant.Outlined" class="rz-my-4">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+        <div>Modo de Edición:</div>
+        <RadzenSelectBar @bind-Value="@editMode" TextProperty="Text" ValueProperty="Value"
+        Data="@(Enum.GetValues(typeof(DataGridEditMode)).Cast<DataGridEditMode>().Select(t => new { Text = $"{t}", Value = t }))"
+        Size="ButtonSize.Small" />
+    </RadzenStack>
+</RadzenCard>
+
+<RadzenDataGrid @ref="productosGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+Data="@productos" TItem="Producto" ColumnWidth="200px" PagerPosition="@pagerPosition"
+                ExpandMode="DataGridExpandMode.Single"
+                RowExpand="@OnRowExpand"
+EditMode="@editMode"
+RowUpdate="@OnUpdateRow"
+RowCreate="@OnCreateRow"
+AndOperatorText="Y"
+OrOperatorText="O"
+ApplyFilterText="Aplicar"
+ClearFilterText="Limpiar"
+FilterCaseSensitivityText="Distinguir mayúsculas"
+ContainsText="Contiene"
+DoesNotContainText="No contiene"
+StartsWithText="Empieza por"
+EndsWithText="Termina en"
+EqualsText="Es igual a"
+NotEqualsText="No es igual a"
+IsNullText="Es nulo"
+IsNotNullText="No es nulo"
+GreaterThanText="Mayor que"
+GreaterThanOrEqualsText="Mayor o igual que"
+LessThanText="Menor que"
+LessThanOrEqualsText="Menor o igual que"
+IsEmptyText="Esta Vacio"
+IsNotEmptyText="No esta Vacio"
+PageSizeText="Elementos por página"
+PagingSummaryFormat="Mostrando página {0} de {1} (total {2} elementos)">
+
+
+    <Template Context="producto">
+        <div class="rz-p-4">
+            <h5>Stock en Tiendas para: @producto.NombreProducto</h5>
+            
+            <RadzenDataGrid @ref="stockGrid" Data="@producto.StocksEnTiendas" TItem="ProductoStockInfo"
+                            AllowSorting="true" AllowPaging="true" PageSize="5"
+                            EditMode="DataGridEditMode.Single" RowUpdate="@OnStockUpdate">
+                <Columns>
+                    <RadzenDataGridColumn Property="@nameof(ProductoStockInfo.IdTienda)" Title="ID Tienda" Width="100px" />
+                    <RadzenDataGridColumn Property="@nameof(ProductoStockInfo.NombreTienda)" Title="Tienda" />
+                    <RadzenDataGridColumn Property="@nameof(ProductoStockInfo.Direccion)" Title="Dirección" />
+                    <RadzenDataGridColumn Property="@nameof(ProductoStockInfo.Ciudad)" Title="Ciudad" />
+                    <RadzenDataGridColumn Property="@nameof(ProductoStockInfo.Stock)" Title="Stock" Width="120px">
+                        <EditTemplate Context="stockInfo">
+                            <RadzenNumeric @bind-Value="stockInfo.Stock" Style="width:100%" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn Context="stockInfo" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="80px">
+                        <Template Context="stockInfo">
+                            @* Ahora 'stockGrid' existirá y estos botones funcionarán *@
+                            <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(args => stockGrid.EditRow(stockInfo))" @onclick:stopPropagation="true" />
+                        </Template>
+                        <EditTemplate Context="stockInfo">
+                            <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@(args => stockGrid.UpdateRow(stockInfo))" />
+                            <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="rz-ms-1" Click="@(args => stockGrid.CancelEditRow(stockInfo))" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </div>
+    </Template>
+
+    <HeaderTemplate>
+        <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle" Text="Añadir Nuevo Producto" Click="@InsertRow" Disabled="@(productoToInsert != null)" />
+    </HeaderTemplate>
+
+    
+    <Columns>
+        <RadzenDataGridColumn Property="@nameof(Producto.Id)" Title="ID" Width="80px" TextAlign="TextAlign.Center" />
+
+        <RadzenDataGridColumn Title="Imagen" Sortable="false" Filterable="false" Width="150px">
+            <Template Context="producto">
+                @if (!string.IsNullOrEmpty(producto.Imagen))
+                {
+                    <RadzenImage Path="@producto.Imagen" style="width: 40px; height: 40px; border-radius: 8px;" AlternateText="@(producto.NombreProducto)" />
+                }
+                else
+                {
+                    <RadzenIcon Icon="image" Style="font-size: 40px; color: #ccc;" />
+                }
+            </Template>
+            <EditTemplate Context="producto">
+                <RadzenStack Gap="1rem" AlignItems="AlignItems.Center">
+
+                    @if (!string.IsNullOrEmpty(producto.Imagen))
+                    {
+                        <RadzenImage Path="@producto.Imagen" style="width: 60px; height: 60px; border-radius: 8px;" />
+                    }
+
+                    <RadzenFileInput TValue="string" Style="width: 100%"
+                    InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "select file" }})"
+                    Change=@(args => OnFileSelect(args, producto))
+                    Error=@(args => Console.WriteLine($"Error al seleccionar archivo: {args.Message}")) />
+
+                    @if (!string.IsNullOrEmpty(newImageFileName))
+                    {
+                        <RadzenText Text="@($"Seleccionado: {newImageFileName}")" TextStyle="TextStyle.Caption" />
+                    }
+                </RadzenStack>
+            </EditTemplate>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="@nameof(Producto.NombreProducto)" Title="Nombre">
+
+            <EditTemplate Context="producto">
+                <RadzenTextBox @bind-Value="producto.NombreProducto" Style="width:100%; display: block" Name="NombreProducto" />
+                <RadzenRequiredValidator Text="El nombre es requerido" Component="NombreProducto" Popup="true" />
+            </EditTemplate>
+
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="@nameof(Producto.IdCategoria)" Title="Categoría" Width="180px">
+            <Template Context="producto">
+                @(categorias?.FirstOrDefault(c => c.Id == producto.IdCategoria)?.NombreCategoria)
+            </Template>
+            <EditTemplate Context="producto">
+                <RadzenDropDown @bind-Value="producto.IdCategoria"
+                Data="@categorias"
+                TextProperty="NombreCategoria"
+                ValueProperty="Id"
+                Style="width:100%; display: block;"
+                Name="IdCategoria" />
+                <RadzenRequiredValidator Text="La categoría es requerida" Component="IdCategoria" DefaultValue="0" Popup="true" />
+            </EditTemplate>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="@nameof(Producto.PrecioVenta)" Title="Precio Venta">
+            <Template Context="producto">
+                @String.Format(new System.Globalization.CultureInfo("es-BO"), "{0:C}", producto.PrecioVenta)
+            </Template>
+
+            <EditTemplate Context="producto">
+                <RadzenNumeric TValue="decimal" @bind-Value="producto.PrecioVenta" Style="width:100%; display: block" Name="PrecioVenta" />
+                <RadzenRequiredValidator Text="El precio es requerido" Component="PrecioVenta" Popup="true" />
+            </EditTemplate>
+
+        </RadzenDataGridColumn>
+
+
+        <RadzenDataGridColumn Context="producto" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+            <Template Context="producto">
+                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                Click="@(args => EditRow(producto))" @onclick:stopPropagation="true" />
+
+                <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                class="rz-ms-1" Click="@(args => DeleteRow(producto))" @onclick:stopPropagation="true" />
+            </Template>
+            <EditTemplate Context="producto">
+                <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                Click="@((args) => SaveRow(producto))" />
+
+                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                class="rz-ms-1" Click="@((args) => CancelEdit(producto))" />
+
+                <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                class="rz-ms-1" Click="@(args => DeleteRow(producto))" />
+            </EditTemplate>
+        </RadzenDataGridColumn>
+
+
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    List<Producto>? productos;
+    List<Categoria>? categorias;
+
+
+    RadzenDataGrid<Producto> productosGrid;
+    RadzenDataGrid<ProductoStockInfo> stockGrid;
+    DataGridEditMode editMode = DataGridEditMode.Single;
+    Producto productoToInsert;
+    Producto productoToUpdate;
+
+    string? newImageDataUrl;
+    string? newImageFileName;
+
+    PagerPosition pagerPosition = PagerPosition.Bottom;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Task.WhenAll(
+            LoadProductos(),
+            LoadCategorias()
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar los productos: {ex.Message}");
+        }
+    }
+
+    async Task LoadProductos()
+    {
+        productos = await Http.GetFromJsonAsync<List<Producto>>("api/Producto");
+    }
+
+    async Task LoadCategorias()
+    {
+        categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias");
+    }
+
+    async Task OnRowExpand(Producto producto)
+    {
+        // Si los datos de stock para este producto aún no se han cargado
+        if (producto.StocksEnTiendas == null)
+        {
+            try
+            {
+                // Hacemos la llamada a nuestro nuevo endpoint de API
+                producto.StocksEnTiendas = await Http.GetFromJsonAsync<List<ProductoStockInfo>>($"api/Producto/{producto.Id}/stockentiendas");
+                // Forzamos la actualización de la UI para que muestre la tabla anidada
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al cargar el stock de tiendas: {ex.Message}");
+                // Opcional: Mostrar una notificación al usuario
+            }
+        }
+    }
+
+    async Task OnStockUpdate(ProductoStockInfo stockInfo)
+    {
+        try
+        {
+            // Hacemos la llamada a nuestro endpoint para actualizar
+            var response = await Http.PutAsJsonAsync("api/ProductoTienda", stockInfo);
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Error al actualizar el stock.");
+                
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al actualizar stock: {ex.Message}");
+        }
+    }
+
+    // Pone una fila en modo de edición
+    async Task EditRow(Producto producto)
+    {
+        newImageDataUrl = null;
+        newImageFileName = null;
+
+        productoToUpdate = new Producto
+            {
+                Id = producto.Id,
+                NombreProducto = producto.NombreProducto,
+                PrecioVenta = producto.PrecioVenta,
+                Imagen = producto.Imagen,
+                IdCategoria = producto.IdCategoria
+            };
+        await productosGrid.EditRow(producto);
+    }
+
+
+    // Se dispara cuando el usuario selecciona un archivo con RadzenFileInput
+    void OnFileSelect(string dataUrl, Producto productoContext)
+    {
+        // RadzenFileInput con TValue="string" devuelve un DataURL (ej: "data:image/png;base64,iVBORw0KGgo...")
+        this.newImageDataUrl = dataUrl;
+
+        this.newImageFileName = "nueva_imagen";
+
+        StateHasChanged(); // Actualiza la UI para mostrar el feedback
+    }
+
+    // Se dispara al hacer clic en el botón "check" (guardar)
+    async Task SaveRow(Producto producto)
+    {
+        try
+        {
+            // Paso 1: Comprobar si se ha seleccionado una nueva imagen.
+            if (!string.IsNullOrEmpty(newImageDataUrl))
+            {
+                // Extraemos solo la parte Base64 del DataURL
+                var base64Content = newImageDataUrl.Split(',')[1];
+
+                // Paso 2: Crear el payload y subirlo a nuestro nuevo endpoint.
+                var payload = new { FileContentBase64 = base64Content, FileName = newImageFileName ?? "image.png" };
+                var response = await Http.PostAsJsonAsync("api/Upload/from-bytes", payload);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Paso 3: Obtener la nueva URL de Cloudinary y actualizar el producto.
+                    var responseJson = await response.Content.ReadAsStringAsync();
+                    var newUrl = JsonSerializer.Deserialize<JsonElement>(responseJson).GetProperty("url").GetString();
+                    producto.Imagen = newUrl;
+                }
+                else
+                {
+                    // Si la subida falla, detenemos el proceso de guardado y notificamos.
+                    var error = await response.Content.ReadAsStringAsync();
+                    await JSRuntime.InvokeVoidAsync("alert", $"Error al subir la imagen: {error}");
+                    return; // Detiene la ejecución
+                }
+            }
+
+            // Paso 4: Proceder con la actualización de la fila en el DataGrid (y en la BBDD).
+            await productosGrid.UpdateRow(producto);
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Ha ocurrido un error al guardar: {ex.Message}");
+        }
+        finally
+        {
+            // Paso 5: Limpiar las variables del archivo.
+            newImageDataUrl = null;
+            newImageFileName = null;
+        }
+    }
+
+    // Se dispara cuando se cancela la edición
+    void CancelEdit(Producto producto)
+    {
+        if (producto == productoToInsert)
+        {
+            productoToInsert = null;
+        }
+        else if (productoToUpdate != null)
+        {
+            // Restaurar todos los valores, incluida la categoría
+            producto.NombreProducto = productoToUpdate.NombreProducto;
+            producto.PrecioVenta = productoToUpdate.PrecioVenta;
+            producto.Imagen = productoToUpdate.Imagen;
+            producto.IdCategoria = productoToUpdate.IdCategoria; // <-- AÑADIR
+            productoToUpdate = null;
+        }
+        newImageDataUrl = null;
+        newImageFileName = null;
+        productosGrid.CancelEditRow(producto);
+    }
+
+    // Se dispara para eliminar una fila
+    async Task DeleteRow(Producto producto)
+    {
+        // Si es una fila nueva que aún no se ha guardado, solo la quitamos de la vista
+        if (producto == productoToInsert)
+        {
+            productoToInsert = null;
+        }
+        else if (productos.Contains(producto))
+        {
+            // Pedimos confirmación antes de borrar
+            if (await JSRuntime.InvokeAsync<bool>("confirm", $"¿Estás seguro de que quieres eliminar el producto '{producto.NombreProducto}'?"))
+            {
+                // Llamada a la API para eliminar el producto
+                var response = await Http.DeleteAsync($"api/Producto/{producto.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    // Recargamos los datos para reflejar el cambio
+                    await OnInitializedAsync();
+                }
+                else
+                {
+                    Console.WriteLine("Error al eliminar el producto.");
+                }
+            }
+        }
+
+        await productosGrid.Reload();
+    }
+
+    // Prepara una nueva fila para ser insertada
+    async Task InsertRow()
+    {
+        productoToInsert = new Producto();
+        await productosGrid.InsertRow(productoToInsert);
+    }
+
+    // Se dispara cuando el grid crea la nueva fila. Aquí es donde la guardamos en la BBDD.
+    async void OnCreateRow(Producto producto)
+    {
+        // Llamada a la API para crear el nuevo producto
+        var response = await Http.PostAsJsonAsync("api/Producto", producto);
+        if (response.IsSuccessStatusCode)
+        {
+            productoToInsert = null;
+            await OnInitializedAsync();
+        }
+        else
+        {
+            Console.WriteLine("Error al crear el producto.");
+        }
+    }
+
+    // Se dispara cuando el grid actualiza una fila. Aquí es donde la actualizamos en la BBDD.
+    async void OnUpdateRow(Producto producto)
+    {
+        // Llamada a la API para actualizar el producto
+        var response = await Http.PutAsJsonAsync($"api/Producto/{producto.Id}", producto);
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Error al actualizar el producto.");
+            // Si falla, revertimos los cambios al estado original
+            CancelEdit(producto);
+        }
+        productoToUpdate = null;
+    }
+}

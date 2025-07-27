@@ -1,0 +1,204 @@
+﻿@inject HttpClient Http
+@using Models
+@using System.Globalization
+
+<PageTitle>Información General</PageTitle>
+
+<RadzenText Text="Resumen del Inventario" TextStyle="TextStyle.H4" TagName="TagName.H1" class="rz-mb-4" />
+
+@if (isLoading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" />
+}
+else
+{
+    @* Fila de Widgets Principales *@
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="h-100">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                    <RadzenIcon Icon="inventory_2" class="rz-background-color-primary-lighter rz-color-primary rz-display-flex rz-align-items-center rz-justify-content-center rz-border-radius-10" Style="width: 48px; height: 48px;" />
+                    <RadzenStack Gap="0">
+                        <RadzenText Text="Productos Totales" TextStyle="TextStyle.Body2" />
+                        <RadzenText Text="@totalProductos.ToString()" TextStyle="TextStyle.H6" TagName="TagName.H2" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="h-100">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                    <RadzenIcon Icon="all_inbox" class="rz-background-color-info-lighter rz-color-info rz-display-flex rz-align-items-center rz-justify-content-center rz-border-radius-10" Style="width: 48px; height: 48px;" />
+                    <RadzenStack Gap="0">
+                        <RadzenText Text="Stock Total (Unidades)" TextStyle="TextStyle.Body2" />
+                        <RadzenText Text="@totalStock.ToString("N0")" TextStyle="TextStyle.H6" TagName="TagName.H2" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="h-100">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                    <RadzenIcon Icon="monetization_on" class="rz-background-color-success-lighter rz-color-success rz-display-flex rz-align-items-center rz-justify-content-center rz-border-radius-10" Style="width: 48px; height: 48px;" />
+                    <RadzenStack Gap="0">
+                        <RadzenText Text="Valor del Inventario" TextStyle="TextStyle.Body2" />
+                        <RadzenText Text="@valorTotalInventario.ToString("C", new CultureInfo("es-BO"))" TextStyle="TextStyle.H6" TagName="TagName.H2" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @* Fila de Información Destacada y Gráfico *@
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeLG="6">
+            <RadzenCard class="h-100">
+                <RadzenText Text="Distribución de Stock por Categoría" TextStyle="TextStyle.H6" TagName="TagName.H3" class="rz-mb-4" />
+                <RadzenChart>
+                    <RadzenPieSeries Data="@stockPorCategoria" CategoryProperty="NombreCategoria" ValueProperty="StockTotal" />
+                    <RadzenLegend Position="LegendPosition.Right" />
+                </RadzenChart>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeLG="6">
+            <RadzenStack Gap="1rem">
+                <RadzenCard>
+                    <RadzenText Text="Producto más caro" TextStyle="TextStyle.Body2" />
+                    <RadzenText Text="@(productoMasCaro?.NombreProducto ?? "N/A")" TextStyle="TextStyle.Subtitle1" />
+                    <RadzenText Text="@(productoMasCaro?.PrecioVenta.ToString("C", new CultureInfo("es-BO")) ?? "")" TextStyle="TextStyle.Body1" />
+                </RadzenCard>
+                <RadzenCard>
+                    <RadzenText Text="Producto más barato" TextStyle="TextStyle.Body2" />
+                    <RadzenText Text="@(productoMasBarato?.NombreProducto ?? "N/A")" TextStyle="TextStyle.Subtitle1" />
+                    <RadzenText Text="@(productoMasBarato?.PrecioVenta.ToString("C", new CultureInfo("es-BO")) ?? "")" TextStyle="TextStyle.Body1" />
+                </RadzenCard>
+                <RadzenCard>
+                    <RadzenText Text="Categoría con más productos" TextStyle="TextStyle.Body2" />
+                    <RadzenText Text="@(categoriaConMasProductos ?? "N/A")" TextStyle="TextStyle.Subtitle1" />
+                </RadzenCard>
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @* Fila de Productos con Bajo Stock *@
+    <RadzenRow>
+        <RadzenColumn Size="12">
+            <RadzenCard>
+                <RadzenText Text="Productos con Stock Crítico (Menos de 50 unidades)" TextStyle="TextStyle.H6" TagName="TagName.H3" class="rz-mb-2" />
+                <RadzenDataGrid Data="@productosBajoStock" TItem="ProductoStockInfo" AllowPaging="true" PageSize="5">
+                    <Columns>
+                        <RadzenDataGridColumn Property="IdProducto" Title="ID Prod." />
+                        <RadzenDataGridColumn Title="Producto">
+                            <Template Context="data">
+                                @(productos.FirstOrDefault(p => p.Id == data.IdProducto)?.NombreProducto)
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn Property="Stock" Title="Stock Total" />
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+}
+
+
+@code {
+    private bool isLoading = true;
+
+    // Listas de datos crudos
+    private List<Producto> productos = new();
+    private List<Categoria> categorias = new();
+    private List<ProductoTienda> productoTiendas = new();
+
+    // Métricas calculadas
+    private int totalProductos;
+    private int totalStock;
+    private decimal valorTotalInventario;
+    private Producto? productoMasCaro;
+    private Producto? productoMasBarato;
+    private string? categoriaConMasProductos;
+    private List<ProductoStockInfo> productosBajoStock = new();
+    private List<StockPorCategoriaViewModel> stockPorCategoria = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // Cargamos todos los datos necesarios en paralelo
+            await Task.WhenAll(
+                LoadProductos(),
+                LoadCategorias(),
+                LoadProductoTiendas()
+            );
+
+            // Una vez cargados, calculamos las métricas
+            CalculateMetrics();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar el dashboard: {ex.Message}");
+            // Aquí podrías mostrar una notificación de error al usuario
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadProductos() => productos = await Http.GetFromJsonAsync<List<Producto>>("api/Producto") ?? new();
+    private async Task LoadCategorias() => categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias") ?? new();
+    private async Task LoadProductoTiendas() => productoTiendas = await Http.GetFromJsonAsync<List<ProductoTienda>>("api/ProductoTiendas") ?? new();
+
+    private void CalculateMetrics()
+    {
+        if (productos.Any())
+        {
+            totalProductos = productos.Count;
+            productoMasCaro = productos.OrderByDescending(p => p.PrecioVenta).FirstOrDefault();
+            productoMasBarato = productos.OrderBy(p => p.PrecioVenta).FirstOrDefault();
+        }
+
+        if (productoTiendas.Any())
+        {
+            totalStock = productoTiendas.Sum(pt => pt.Stock);
+
+            // Para el valor, primero creamos un diccionario de precios para buscar rápido
+            var precios = productos.ToDictionary(p => p.Id, p => p.PrecioVenta);
+            valorTotalInventario = productoTiendas.Sum(pt => (precios.ContainsKey(pt.IdProducto) ? precios[pt.IdProducto] : 0) * pt.Stock);
+
+            // Productos con bajo stock
+            productosBajoStock = productoTiendas
+                .GroupBy(pt => pt.IdProducto)
+                .Select(g => new ProductoStockInfo { IdProducto = g.Key, Stock = g.Sum(pt => pt.Stock) })
+                .Where(s => s.Stock > 0 && s.Stock < 50)
+                .OrderBy(s => s.Stock)
+                .ToList();
+        }
+
+        if (categorias.Any() && productos.Any())
+        {
+            var topCategoriaGroup = productos
+                .GroupBy(p => p.IdCategoria)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault();
+
+            if (topCategoriaGroup != null)
+            {
+                categoriaConMasProductos = categorias.FirstOrDefault(c => c.Id == topCategoriaGroup.Key)?.NombreCategoria?? "Desconocida";
+            }
+
+            // Datos para el gráfico
+            stockPorCategoria = categorias.Select(cat =>
+            {
+              var idsProductosEnCategoria = productos.Where(p => p.IdCategoria == cat.Id).Select(p => p.Id);
+              var stockTotal = productoTiendas.Where(pt => idsProductosEnCategoria.Contains(pt.IdProducto)).Sum(pt => pt.Stock);
+
+              return new StockPorCategoriaViewModel { NombreCategoria = cat.NombreCategoria, StockTotal = stockTotal };
+                    })
+                    .Where(c => c.StockTotal > 0)
+                    .OrderByDescending(c => c.StockTotal)
+                    .ToList();
+              }
+            }
+}

@@ -1,0 +1,57 @@
+﻿.card {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom: none;
+}
+
+.nav-tabs {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-link {
+    color: #6c757d;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+    .nav-link:hover {
+        color: #495057;
+    }
+
+    .nav-link.active {
+        color: #0d6efd;
+        border-bottom: 3px solid #0d6efd;
+        background-color: transparent;
+    }
+
+.form-control-lg {
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.btn {
+    border-radius: 8px;
+    padding: 12px 0;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+.alert {
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.validation-message {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}

@@ -1,0 +1,35 @@
+﻿@inherits LayoutComponentBase
+@using TiendaVirtual.Client.Services
+
+<div class="admin-layout-container">
+    <Navbar/>
+    <div class="admin-content-wrapper">
+        <header class="admin-top-bar">
+            <!-- Este espacio es para alinear. El contenido va a la derecha. -->
+            <div class="ms-auto d-flex align-items-center">
+                @if (AuthService.EstaLogueado)
+                {
+                    <span class="me-3">Hola, @AuthService.UsuarioActual?.NombreUsuario</span>
+                    <button class="btn btn-outline-danger btn-sm" @onclick="Logout">
+                        <i class="bi bi-box-arrow-right"></i> Salir
+                    </button>
+                }
+            </div>
+        </header>
+
+        <main class="content p-4">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    [Inject] AuthService AuthService { get; set; } = default!;
+    [Inject] NavigationManager Navigation { get; set; } = default!;
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/acceso", forceLoad: true); // forceLoad para recargar y asegurar que todo se limpie
+    }
+}

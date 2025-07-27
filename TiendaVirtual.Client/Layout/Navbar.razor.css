@@ -1,0 +1,63 @@
+﻿/* Estilos para el SideNav con tema claro */
+.bg-menu-theme {
+    background-color: #f5f5f9 !important;
+    color: #697a8d;
+}
+
+.layout-menu {
+    width: 260px; /* Ancho fijo para la barra lateral */
+    flex-shrink: 0; /* Evita que la barra se encoja */
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid #d9dee3;
+    transition: width 0.3s ease;
+}
+
+.app-brand-demo {
+    height: 64px;
+    padding-left: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.app-brand-link {
+    text-decoration: none;
+}
+
+.app-brand-text {
+    font-size: 1.5rem;
+    color: #566a7f;
+}
+
+/* Adaptación para RadzenPanelMenu */
+.rz-panel-menu {
+    background-color: transparent;
+}
+
+    .rz-panel-menu .rz-panel-menu-item-text {
+        color: #697a8d;
+    }
+
+    .rz-panel-menu .rz-panel-menu-item-icon {
+        color: #697a8d;
+    }
+
+    .rz-panel-menu .rz-panel-menu-item:hover {
+        background-color: rgba(105, 108, 255, 0.08);
+    }
+
+        .rz-panel-menu .rz-panel-menu-item:hover .rz-panel-menu-item-text,
+        .rz-panel-menu .rz-panel-menu-item:hover .rz-panel-menu-item-icon {
+            color: #696cff;
+        }
+
+    /* Estilo para el elemento activo */
+    .rz-panel-menu .rz-panel-menu-item-active {
+        background-color: rgba(105, 108, 255, 0.16) !important;
+    }
+
+        .rz-panel-menu .rz-panel-menu-item-active > a > .rz-panel-menu-item-text,
+        .rz-panel-menu .rz-panel-menu-item-active > a > .rz-panel-menu-item-icon {
+            color: #696cff !important;
+            font-weight: bold;
+        }

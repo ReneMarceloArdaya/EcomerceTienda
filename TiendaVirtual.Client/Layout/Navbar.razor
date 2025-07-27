@@ -1,0 +1,69 @@
+﻿@using TiendaVirtual.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<aside class="layout-menu menu-vertical menu bg-menu-theme">
+    <div class="app-brand-demo">
+        <a href="/admin" class="app-brand-link">
+            <span class="app-brand-logo-demo">
+                <i class="bi bi-shop fs-2"></i>
+            </span>
+            <span class="app-brand-text demo menu-text fw-bold ms-2">TiendaVirtual</span>
+        </a>
+    </div>
+
+    <div class="menu-inner-shadow"></div>
+
+    <div class="menu-inner py-1">
+        <RadzenPanelMenu Multiple="true">
+            @if (AuthService.EstaLogueado && AuthService.UsuarioActual != null)
+            {
+                <RadzenPanelMenuItem Text="Dashboard" Icon="home" Path="/admin" />
+
+                <!-- Menú para Administradores -->
+                @if (AuthService.UsuarioActual.TipoUsuario == "Admin")
+                {
+                    <RadzenPanelMenuItem Text="Gestión de Tienda" Icon="storefront">
+                        <RadzenPanelMenuItem Text="Productos" Icon="inventory_2" Path="/admin/productos" />
+                        <RadzenPanelMenuItem Text="Categorías" Icon="style" Path="/admin/categorias" />
+                        <RadzenPanelMenuItem Text="Proveedores" Icon="local_shipping" Path="/admin/proveedores" />
+                        <RadzenPanelMenuItem Text="Tiendas" Icon="store" Path="/admin/tiendas" />
+                        <RadzenPanelMenuItem Text="Gestión de Usuarios" Icon="manage_accounts" Path="/admin/usuarios" />
+                    </RadzenPanelMenuItem>
+                }
+
+                <!-- Menú para Gestor de Pedidos -->
+                @if (new[] { "Admin", "GestorPedidos" }.Contains(AuthService.UsuarioActual.TipoUsuario))
+                {
+                    <RadzenPanelMenuItem Text="Gestión de Pedidos" Icon="receipt_long">
+                        <RadzenPanelMenuItem Text="Pedidos" Icon="receipt" Path="/admin/pedidos" />
+                        <RadzenPanelMenuItem Text="Clientes" Icon="people" Path="/admin/clientes" />
+                        <RadzenPanelMenuItem Text="Delivery" Icon="pedal_bike" Path="/admin/delivery" />
+                    </RadzenPanelMenuItem>
+                }
+            }
+            else
+            {
+                <RadzenPanelMenuItem Text="Iniciar Sesión" Icon="login" Path="/acceso" />
+            }
+        </RadzenPanelMenu>
+    </div>
+</aside>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+    }
+}

@@ -12,7 +12,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped<AuthMessageHandler>();
 builder.Services.AddHttpClient("API", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:32777/"); // Cambia según tu contenedor o puerto real
+    client.BaseAddress = new Uri("http://localhost:32778/"); // Cambia según tu contenedor o puerto real
 })
 .AddHttpMessageHandler<AuthMessageHandler>();
 

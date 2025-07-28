@@ -1,0 +1,287 @@
+﻿@page "/informe/productos"
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@using Models
+@using ClosedXML.Excel
+@using System.IO
+
+<RadzenButton ButtonStyle="ButtonStyle.Info" Icon="file_download" Text="Exportar a Excel" Click="ExportToExcel" class="rz-mb-3" />
+
+<RadzenDataGrid @ref="productosGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                AllowGrouping="true" FilterMode="FilterMode.Advanced"
+                Data="@productos" TItem="Producto" ColumnWidth="200px" PagerPosition="@pagerPosition"
+                AllowVirtualization="false" // Importante para asegurar acceso a Items
+                AndOperatorText="Y"
+                OrOperatorText="O"
+                ApplyFilterText="Aplicar"
+                ClearFilterText="Limpiar"
+                FilterCaseSensitivityText="Distinguir mayúsculas"
+                ContainsText="Contiene"
+                DoesNotContainText="No contiene"
+                StartsWithText="Empieza por"
+                EndsWithText="Termina en"
+                EqualsText="Es igual a"
+                NotEqualsText="No es igual a"
+                IsNullText="Es nulo"
+                IsNotNullText="No es nulo"
+                GreaterThanText="Mayor que"
+                GreaterThanOrEqualsText="Mayor o igual que"
+                LessThanText="Menor que"
+                LessThanOrEqualsText="Menor o igual que"
+                IsEmptyText="Esta Vacio"
+                IsNotEmptyText="No esta Vacio"
+                PageSizeText="Elementos por página"
+                PagingSummaryFormat="Mostrando página {0} de {1} (total {2} elementos)">
+    <Columns>
+        <RadzenDataGridColumn Property="@nameof(Producto.Id)" Title="ID" Width="80px" TextAlign="TextAlign.Center" />
+        <RadzenDataGridColumn Title="Imagen" Sortable="false" Filterable="false" Groupable="false" Width="100px">
+            <Template Context="producto">
+                @if (!string.IsNullOrEmpty(producto.Imagen))
+                {
+                    <RadzenImage Path="@producto.Imagen" style="width: 40px; height: 40px; border-radius: 8px;" AlternateText="@(producto.NombreProducto)" />
+                }
+                else
+                {
+                    <RadzenIcon Icon="image" Style="font-size: 20px; color: #ccc;" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="@nameof(Producto.NombreProducto)" Title="Nombre" />
+        <RadzenDataGridColumn Property="@nameof(Producto.IdCategoria)" Title="Categoría" Groupable="true">
+            <Template Context="producto">
+                @(categorias?.FirstOrDefault(c => c.Id == producto.IdCategoria)?.NombreCategoria ?? "Sin Categoría")
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="@nameof(Producto.PrecioVenta)" Title="Precio Venta" FormatString="{0:C}" Groupable="false" />
+        <!-- Agrega más columnas según necesites -->
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    List<Producto>? productos;
+    List<Categoria>? categorias;
+    RadzenDataGrid<Producto> productosGrid;
+    PagerPosition pagerPosition = PagerPosition.Bottom;
+    bool isGridLoaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Task.WhenAll(
+                LoadProductos(),
+                LoadCategorias()
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar los datos: {ex.Message}");
+            // Manejo de errores
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isGridLoaded = true;
+        }
+    }
+
+    async Task LoadProductos()
+    {
+        productos = await Http.GetFromJsonAsync<List<Producto>>("api/Producto");
+    }
+
+    async Task LoadCategorias()
+    {
+        categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias");
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (productosGrid == null || productos == null || !isGridLoaded) return;
+
+        try
+        {
+            // Esperar un momento para asegurar que el grid ha aplicado filtros/orden
+            await Task.Delay(100);
+
+            // 1. Obtener los datos filtrados, ordenados del DataGrid
+            List<Producto> itemsToExport;
+
+            var viewProperty = productosGrid.GetType().GetProperty("View");
+            if (viewProperty != null)
+            {
+                var viewInstance = viewProperty.GetValue(productosGrid);
+                var dataProperty = viewInstance?.GetType().GetProperty("Data");
+                var data = dataProperty?.GetValue(viewInstance) as IEnumerable<object>;
+
+                if (data != null)
+                {
+                    itemsToExport = data.Cast<Producto>().ToList();
+                }
+                else
+                {
+                    itemsToExport = productos.ToList(); // Exporta todos los datos
+                }
+            }
+            else
+            {
+                // Fallback si View no es accesible
+                itemsToExport = productos.ToList();
+                await JSRuntime.InvokeVoidAsync("alert", "No se pudo acceder a los datos filtrados del grid. Se exportarán todos los datos.");
+            }
+
+            // 2. Crear el libro de trabajo de Excel
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Informe Productos");
+
+            // 3. Obtener las columnas visibles definidas en el DataGrid
+            var visibleColumns = productosGrid.ColumnsCollection.Where(c => c.Visible && !string.IsNullOrEmpty(c.GetTitle())).ToList();
+
+            // 4. Manejar Agrupaciones
+            var groupDescriptors = productosGrid.Groups; // Lista de GroupDescriptor
+            int groupLevelCount = groupDescriptors.Count;
+            int currentRow = 1;
+
+            // Escribir encabezados de agrupación (si hay)
+            if (groupLevelCount > 0)
+            {
+                for (int i = 0; i < groupLevelCount; i++)
+                {
+                    var groupDescriptor = groupDescriptors[i];
+                    // Encontrar la columna correspondiente al grupo
+                    var groupColumn = visibleColumns.FirstOrDefault(c => c.GetGroupProperty() == groupDescriptor.Property);
+                    string groupTitle = groupColumn?.GetTitle() ?? groupDescriptor.Property;
+
+                    worksheet.Cell(currentRow, i + 1).Value = $"Grupo por: {groupTitle}";
+                    worksheet.Cell(currentRow, i + 1).Style.Font.Bold = true;
+                    worksheet.Cell(currentRow, i + 1).Style.Fill.BackgroundColor = XLColor.LightGray;
+                }
+                currentRow++;
+            }
+
+            // 5. Escribir encabezados de columnas de datos
+            for (int i = 0; i < visibleColumns.Count; i++)
+            {
+                int colIndex = groupLevelCount + i + 1; // Ajustar por niveles de grupo
+                worksheet.Cell(currentRow, colIndex).Value = visibleColumns[i].GetTitle();
+                worksheet.Cell(currentRow, colIndex).Style.Font.Bold = true;
+                worksheet.Cell(currentRow, colIndex).Style.Fill.BackgroundColor = XLColor.Gray;
+            }
+            int headerRow = currentRow;
+            currentRow++;
+
+            // 6. Escribir datos (simulando agrupación simple en Excel)
+            var cultureEsBo = new System.Globalization.CultureInfo("es-BO");
+
+            foreach (var item in itemsToExport)
+            {
+                // Escribir valores de grupo en las primeras columnas (simplificado)
+                for (int g = 0; g < groupLevelCount; g++)
+                {
+                    var groupDescriptor = groupDescriptors[g];
+                    object groupValue = GetPropertyValue(item, groupDescriptor.Property);
+
+                    // Si es IdCategoria, mostrar el nombre
+                    if (groupDescriptor.Property == nameof(Producto.IdCategoria))
+                    {
+                        groupValue = categorias?.FirstOrDefault(c => c.Id.Equals(groupValue))?.NombreCategoria ?? groupValue?.ToString() ?? "Sin Categoría";
+                    }
+
+                    worksheet.Cell(currentRow, g + 1).Value = groupValue?.ToString() ?? "";
+                }
+
+                // Escribir valores de datos
+                for (int i = 0; i < visibleColumns.Count; i++)
+                {
+                    int colIndex = groupLevelCount + i + 1;
+                    var column = visibleColumns[i];
+                    string propertyPath = column.GetFilterProperty(); // Usar FilterProperty
+
+                    object cellValue = "[No Exportable]";
+
+                    if (propertyPath == nameof(Producto.IdCategoria))
+                    {
+                        // Caso especial: mostrar nombre de categoría en lugar de ID
+                        var catId = GetPropertyValue(item, propertyPath);
+                        cellValue = categorias?.FirstOrDefault(c => c.Id.Equals(catId))?.NombreCategoria ?? "Sin Categoría";
+                    }
+                    else if (column.Property == nameof(Producto.IdCategoria))
+                    {
+                        // Alternativa si Property está disponible
+                        var catId = item.IdCategoria;
+                        cellValue = categorias?.FirstOrDefault(c => c.Id == catId)?.NombreCategoria ?? "Sin Categoría";
+                    }
+                    else
+                    {
+                        // Obtener valor de propiedades simples
+                        var value = GetPropertyValue(item, propertyPath);
+                        if (value is DateTime dt)
+                        {
+                            cellValue = dt;
+                        }
+                        else if (value is IFormattable formattable && !string.IsNullOrEmpty(column.FormatString))
+                        {
+                            cellValue = formattable.ToString(column.FormatString, cultureEsBo);
+                        }
+                        else if (value is IFormattable formattableSimple && propertyPath == nameof(Producto.PrecioVenta))
+                        {
+                            cellValue = formattableSimple.ToString("C", cultureEsBo); // Formato moneda BO
+                        }
+                        else
+                        {
+                            cellValue = value?.ToString() ?? "";
+                        }
+                    }
+
+                    worksheet.Cell(currentRow, colIndex).Value = cellValue?.ToString() ?? "";
+                }
+                currentRow++;
+            }
+
+            // 7. Aplicar autofiltros a la fila de encabezados
+            var lastColumn = groupLevelCount + visibleColumns.Count;
+            if (lastColumn > 0)
+            {
+                worksheet.Range(worksheet.Cell(headerRow, 1), worksheet.Cell(headerRow, lastColumn)).SetAutoFilter();
+            }
+
+            // 8. Autoajustar columnas
+            worksheet.Columns().AdjustToContents();
+
+            // 9. Guardar en MemoryStream
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            // 10. Descargar usando JS Interop
+            var base64 = Convert.ToBase64String(stream.ToArray());
+            await JSRuntime.InvokeVoidAsync("downloadFile", "informe_productos.xlsx", base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error al exportar a Excel: {ex}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Error al exportar: {ex.Message}");
+        }
+    }
+
+    
+    private object GetPropertyValue(object obj, string propertyPath)
+    {
+        if (obj == null || string.IsNullOrEmpty(propertyPath))
+            return null;
+
+        
+        var propertyInfo = obj.GetType().GetProperty(propertyPath);
+        if (propertyInfo != null)
+        {
+            return propertyInfo.GetValue(obj);
+        }
+
+        
+        return null;
+    }
+}

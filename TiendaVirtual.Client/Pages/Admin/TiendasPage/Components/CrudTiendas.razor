@@ -1,0 +1,312 @@
+﻿
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject DialogService DialogService
+@using Models
+@using TiendaVirtual.Client.Components;
+@using TiendaVirtual.Client.Services;
+
+
+<h3>Gestión de Tiendas</h3>
+
+@if (tiendas == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle" Text="Añadir Nueva Tienda" Click="@InsertRow" Disabled="@(tiendaToInsert != null)" class="rz-mb-3" />
+
+    <RadzenDataGrid @ref="tiendasGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+    Data="@tiendas" TItem="Tienda" ColumnWidth="200px" PagerPosition="@pagerPosition"
+                    EditMode="@editMode"
+                    RowUpdate="@OnUpdateRow"
+                    RowCreate="@OnCreateRow"
+                    AndOperatorText="Y"
+                    OrOperatorText="O"
+                    ApplyFilterText="Aplicar"
+                    ClearFilterText="Limpiar"
+                    FilterCaseSensitivityText="Distinguir mayúsculas"
+                    ContainsText="Contiene"
+                    DoesNotContainText="No contiene"
+                    StartsWithText="Empieza por"
+                    EndsWithText="Termina en"
+                    EqualsText="Es igual a"
+                    NotEqualsText="No es igual a"
+                    IsNullText="Es nulo"
+                    IsNotNullText="No es nulo"
+                    GreaterThanText="Mayor que"
+                    GreaterThanOrEqualsText="Mayor o igual que"
+                    LessThanText="Menor que"
+                    LessThanOrEqualsText="Menor o igual que"
+                    IsEmptyText="Esta Vacio"
+                    IsNotEmptyText="No esta Vacio"
+                    PageSizeText="Elementos por página"
+                    PagingSummaryFormat="Mostrando página {0} de {1} (total {2} elementos)">
+        <Columns>
+            <RadzenDataGridColumn Property="@nameof(Tienda.Id)" Title="ID" Width="80px" TextAlign="TextAlign.Center" Filterable="false" />
+            <RadzenDataGridColumn Property="@nameof(Tienda.NombreTienda)" Title="Nombre de Tienda">
+                <EditTemplate Context="tienda">
+                    <RadzenTextBox @bind-Value="tienda.NombreTienda" Style="width:100%; display: block" Name="NombreTienda" />
+                    <RadzenRequiredValidator Text="El nombre es requerido" Component="NombreTienda" Popup="true" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="@nameof(Tienda.Direccion)" Title="Dirección">
+                <EditTemplate Context="tienda">
+                    <RadzenTextBox @bind-Value="tienda.Direccion" Style="width:100%; display: block" Name="Direccion" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="@nameof(Tienda.Ciudad)" Title="Ciudad">
+                <EditTemplate Context="tienda">
+                    <RadzenTextBox @bind-Value="tienda.Ciudad" Style="width:100%; display: block" Name="Ciudad" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Title="Ubicación" Width="250px">
+                 <Template Context="tienda">
+                    @if(tienda.Latitud.HasValue && tienda.Longitud.HasValue)
+                    {
+                        <span>Lat: @tienda.Latitud.Value.ToString("F4"), Lng: @tienda.Longitud.Value.ToString("F4")</span>
+                    }
+                    else
+                    {
+                        <span>Sin ubicación</span>
+                    }
+                </Template>
+                 <EditTemplate Context="tienda">
+                    <RadzenButton Text="Seleccionar Ubicación" Click="@(args => AbrirMapa(tienda))" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" />
+                    @if (tienda.Latitud.HasValue && tienda.Longitud.HasValue)
+                    {
+                        <div style="font-size: 0.8em; margin-top: 5px;">
+                            <span>Lat: @tienda.Latitud.Value.ToString("F4")</span><br />
+                            <span>Lng: @tienda.Longitud.Value.ToString("F4")</span>
+                        </div>
+                    }
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Context="tienda" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="120px">
+                <Template Context="tienda">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
+                    Click="@(args => EditRow(tienda))" @onclick:stopPropagation="true" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Small"
+                    class="rz-ms-1" Click="@(args => DeleteRow(tienda))" @onclick:stopPropagation="true" />
+                </Template>
+                <EditTemplate Context="tienda">
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Small"
+                    Click="@((args) => SaveRow(tienda))" />
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
+                    class="rz-ms-1" Click="@((args) => CancelEdit(tienda))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+
+
+
+@code {
+    List<Tienda>? tiendas;
+    RadzenDataGrid<Tienda> tiendasGrid;
+    DataGridEditMode editMode = DataGridEditMode.Single;
+    Tienda tiendaToInsert;
+    Tienda tiendaToUpdate;
+    PagerPosition pagerPosition = PagerPosition.Bottom;
+
+    // Variables para el mapa
+    private bool mostrarMapa = false;
+    private Tienda tiendaEnEdicion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTiendas();
+    }
+
+    async Task LoadTiendas()
+    {
+        try
+        {
+            tiendas = await Http.GetFromJsonAsync<List<Tienda>>("api/Tiendas");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar las tiendas: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Error al cargar las tiendas: {ex.Message}");
+        }
+    }
+
+
+    async Task EditRow(Tienda tienda)
+    {
+        tiendaToUpdate = new Tienda
+            {
+                Id = tienda.Id,
+                NombreTienda = tienda.NombreTienda,
+                Direccion = tienda.Direccion,
+                Ciudad = tienda.Ciudad,
+                Latitud = tienda.Latitud,
+                Longitud = tienda.Longitud
+            };
+        await tiendasGrid.EditRow(tienda);
+    }
+
+    void CancelEdit(Tienda tienda)
+    {
+        if (tienda == tiendaToInsert)
+        {
+            tiendaToInsert = null;
+        }
+        else if (tiendaToUpdate != null)
+        {
+            tienda.NombreTienda = tiendaToUpdate.NombreTienda;
+            tienda.Direccion = tiendaToUpdate.Direccion;
+            tienda.Ciudad = tiendaToUpdate.Ciudad;
+            tienda.Latitud = tiendaToUpdate.Latitud;
+            tienda.Longitud = tiendaToUpdate.Longitud;
+            tiendaToUpdate = null;
+        }
+        tiendasGrid.CancelEditRow(tienda);
+    }
+
+    async Task DeleteRow(Tienda tienda)
+    {
+        if (tienda == tiendaToInsert)
+        {
+            tiendaToInsert = null;
+        }
+        else if (tiendas.Contains(tienda))
+        {
+            if (await JSRuntime.InvokeAsync<bool>("confirm", $"¿Estás seguro de que quieres eliminar la tienda '{tienda.NombreTienda}'?"))
+            {
+                try
+                {
+                    var response = await Http.DeleteAsync($"api/Tiendas/{tienda.Id}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        await LoadTiendas();
+                        await tiendasGrid.Reload();
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Error al eliminar la tienda: {response.StatusCode} - {errorContent}");
+                        await JSRuntime.InvokeVoidAsync("alert", $"Error al eliminar la tienda: {response.StatusCode}. {errorContent}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Excepción al eliminar la tienda: {ex.Message}");
+                    await JSRuntime.InvokeVoidAsync("alert", $"Excepción al eliminar la tienda: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    async Task InsertRow()
+    {
+        tiendaToInsert = new Tienda();
+        await tiendasGrid.InsertRow(tiendaToInsert);
+    }
+
+    async Task SaveRow(Tienda tienda)
+    {
+        if (tienda == tiendaToInsert)
+        {
+            await OnCreateRow(tienda);
+        }
+        else
+        {
+            await OnUpdateRow(tienda);
+        }
+    }
+
+    async Task OnCreateRow(Tienda tienda)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/Tiendas", tienda);
+            if (response.IsSuccessStatusCode)
+            {
+                tiendaToInsert = null;
+                await LoadTiendas();
+                await tiendasGrid.Reload();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al crear la tienda: {response.StatusCode} - {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excepción al crear la tienda: {ex.Message}");
+        }
+    }
+
+    async Task OnUpdateRow(Tienda tienda)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/Tiendas/{tienda.Id}", tienda);
+            if (response.IsSuccessStatusCode)
+            {
+                tiendaToUpdate = null;
+                await LoadTiendas();
+                await tiendasGrid.Reload();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al actualizar la tienda: {response.StatusCode} - {errorContent}");
+                CancelEdit(tienda); // Revertir cambios locales
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excepción al actualizar la tienda: {ex.Message}");
+            CancelEdit(tienda); // Revertir cambios locales
+        }
+    }
+
+    // Métodos para el mapa
+    private async Task AbrirMapa(Tienda tienda)
+    {
+        var result = await DialogService.OpenAsync<MapaSelectorDialog>(
+            "Seleccionar ubicación",
+            new Dictionary<string, object>
+                {
+                    { "Latitud", tienda.Latitud },
+                    { "Longitud", tienda.Longitud }
+                },
+            new DialogOptions() { Width = "800px", Height = "500px", Resizable = true }
+        );
+
+        if (result is MapaSelectorDialog.CoordenadasModel coordenadas)
+        {
+            tienda.Latitud = coordenadas.Latitud;
+            tienda.Longitud = coordenadas.Longitud;
+        }
+    }
+
+    private async Task CoordenadasSeleccionadas((decimal? Latitud, decimal? Longitud) coords)
+    {
+        if (tiendaEnEdicion != null)
+        {
+            tiendaEnEdicion.Latitud = coords.Latitud;
+            tiendaEnEdicion.Longitud = coords.Longitud;
+        }
+    }
+
+    private async Task CerrarMapa()
+    {
+        mostrarMapa = false;
+        tiendaEnEdicion = null;
+        StateHasChanged();
+    }
+
+    private async Task GuardarCoordenadas()
+    {
+        // Las coordenadas ya se actualizaron en tiendaEnEdicion cuando se movió el marcador
+        // Solo necesitamos cerrar el diálogo
+        await CerrarMapa();
+    }
+}

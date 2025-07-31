@@ -67,8 +67,6 @@ CREATE TABLE DireccionEnvio (
     Longitud DECIMAL(11, 8),
     FOREIGN KEY (UsuarioId) REFERENCES Usuario(Id)
 );
-
-
 -- 8. Tabla Categoria
 CREATE TABLE Categoria (
     Id INT AUTO_INCREMENT PRIMARY KEY,
@@ -100,9 +98,11 @@ CREATE TABLE ProveedorProducto (
     IdProducto INT,
     NombreEspecifico VARCHAR(50) NOT NULL,
     PRIMARY KEY (IdProveedor, IdProducto),
-    FOREIGN KEY (IdProveedor) REFERENCES Proveedor(Id),
-    FOREIGN KEY (IdProducto) REFERENCES Producto(Id)
+    FOREIGN KEY (IdProveedor) REFERENCES Proveedor(Id) ON DELETE CASCADE,
+    FOREIGN KEY (IdProducto) REFERENCES Producto(Id) ON DELETE CASCADE
 );
+
+
 
 -- 12. Tabla Carrito
 CREATE TABLE Carrito (
@@ -151,9 +151,10 @@ CREATE TABLE DetallePedido (
     Cantidad FLOAT NOT NULL,
     Precio DECIMAL(12, 2) NOT NULL,
     PRIMARY KEY (IdPedido, IdProducto),
-    FOREIGN KEY (IdPedido) REFERENCES Pedido(Id),
-    FOREIGN KEY (IdProducto) REFERENCES Producto(Id)
+    FOREIGN KEY (IdPedido) REFERENCES Pedido(Id) ON DELETE CASCADE,
+    FOREIGN KEY (IdProducto) REFERENCES Producto(Id) ON DELETE CASCADE
 );
+
 
 -- 17. Tabla Factura
 CREATE TABLE Factura (

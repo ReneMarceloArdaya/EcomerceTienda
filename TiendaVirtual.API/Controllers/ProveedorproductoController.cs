@@ -29,11 +29,13 @@ namespace TiendaVirtual.API.Controllers
             return await _context.Proveedorproductos.ToListAsync();
         }
 
-        // GET: api/Proveedorproductoes/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Proveedorproducto>> GetProveedorproducto(int id)
+        // GET: api/Proveedorproductoes con dos id
+        [HttpGet("proveedor/{idProveedor}/producto/{idProducto}")]
+        public async Task<ActionResult<Proveedorproducto>> GetProveedorproducto(int idProveedor , int idProducto)
         {
-            var proveedorproducto = await _context.Proveedorproductos.FindAsync(id);
+            var proveedorproducto = await _context.Proveedorproductos
+                .FirstOrDefaultAsync(pp => pp.IdProveedor == idProveedor && pp.IdProducto == idProducto);
+          
 
             if (proveedorproducto == null)
             {
@@ -43,22 +45,21 @@ namespace TiendaVirtual.API.Controllers
             return proveedorproducto;
         }
 
-        // PUT: api/Proveedorproductoes/5
+        // PUT: api/Proveedorproducto
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutProveedorproducto(int id, ProveedorProductoDTO dto)
+        [HttpPut("proveedor/{idProveedor}/producto/{idProducto}")]
+        public async Task<IActionResult> PutProveedorproducto(int idProveedor, int idProducto, ProveedorProductoDTO dto)
         {
-            var proveedorproducto = await _context.Proveedorproductos.FindAsync(id);
+            
+            var proveedorproducto = await _context.Proveedorproductos
+                .FirstOrDefaultAsync(pp => pp.IdProveedor == idProveedor && pp.IdProducto == idProducto);
+
             if (proveedorproducto == null)
             {
                 return NotFound();
             }
-            if (id != proveedorproducto.IdProveedor)
-            {
-                return BadRequest();
-            }
 
-
+            proveedorproducto.IdProveedor = dto.IdProveedor;
             proveedorproducto.IdProducto = dto.IdProducto;
             proveedorproducto.NombreEspecifico = dto.NombreEspecifico;
 
@@ -69,7 +70,7 @@ namespace TiendaVirtual.API.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!ProveedorproductoExists(id))
+                if (!ProveedorproductoExists(idProveedor))
                 {
                     return NotFound();
                 }
@@ -77,8 +78,42 @@ namespace TiendaVirtual.API.Controllers
                 {
                     throw;
                 }
+
             }
 
+            return NoContent();
+        }
+
+        //PUT para actualizar un producto con una lista de provedores
+        [HttpPut("actualizarproveedores/producto/{idProducto}")]
+        public async Task<IActionResult> ActualizarProveedores(int IdProducto, List<ProveedorDTO> lista)
+        {
+            var producto = await _context.Productos.FindAsync(IdProducto);
+            if (producto == null)
+            {
+                return NotFound();
+            }
+            // Eliminar los proveedores existentes para el producto
+            var proveedoresExistentes = _context.Proveedorproductos.Where(pp => pp.IdProducto == IdProducto);
+
+            // Si hay provedores existentes, los eliminamos
+            if  ( proveedoresExistentes != null )
+            {
+                _context.Proveedorproductos.RemoveRange(proveedoresExistentes);
+            }
+
+            // Agregar los nuevos proveedores
+            foreach (var proveedor in lista)
+            {
+                var nuevoProveedorProducto = new Proveedorproducto
+                {
+                    IdProveedor = proveedor.Id,
+                    IdProducto = IdProducto,
+                    NombreEspecifico = proveedor.NombreProveedor
+                };
+                _context.Proveedorproductos.Add(nuevoProveedorProducto);
+            }
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 

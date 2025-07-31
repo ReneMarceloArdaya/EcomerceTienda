@@ -36,6 +36,7 @@ namespace TiendaVirtual.API.Controllers
         }
 
         // GET: api/Usuarios/5
+        [Authorize(Roles = "Admin")]
         [HttpGet("{id}")]
         public async Task<ActionResult<Usuario>> GetUsuario(int id)
         {

@@ -1,0 +1,251 @@
+﻿@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@using Models
+
+
+<h3>Gestión de Categorías</h3>
+
+@if (categorias == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <RadzenDataGrid @ref="categoriasGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                    Data="@categorias" TItem="Categoria" ColumnWidth="200px" PagerPosition="@pagerPosition"
+                    EditMode="@editMode"
+                    RowUpdate="@OnUpdateRow"
+                    RowCreate="@OnCreateRow"
+                    AndOperatorText="Y"
+                    OrOperatorText="O"
+                    ApplyFilterText="Aplicar"
+                    ClearFilterText="Limpiar"
+                    FilterCaseSensitivityText="Distinguir mayúsculas"
+                    ContainsText="Contiene"
+                    DoesNotContainText="No contiene"
+                    StartsWithText="Empieza por"
+                    EndsWithText="Termina en"
+                    EqualsText="Es igual a"
+                    NotEqualsText="No es igual a"
+                    IsNullText="Es nulo"
+                    IsNotNullText="No es nulo"
+                    GreaterThanText="Mayor que"
+                    GreaterThanOrEqualsText="Mayor o igual que"
+                    LessThanText="Menor que"
+                    LessThanOrEqualsText="Menor o igual que"
+                    IsEmptyText="Esta Vacio"
+                    IsNotEmptyText="No esta Vacio"
+                    PageSizeText="Elementos por página"
+                    PagingSummaryFormat="Mostrando página {0} de {1} (total {2} elementos)">
+        <HeaderTemplate>
+            <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle" Text="Añadir Nueva Categoría" Click="@InsertRow" Disabled="@(categoriaToInsert != null)" />
+        </HeaderTemplate>
+        <Columns>
+            <RadzenDataGridColumn Property="@nameof(Categoria.Id)" Title="ID" Width="80px" TextAlign="TextAlign.Center" Filterable="false" />
+            <RadzenDataGridColumn Property="@nameof(Categoria.NombreCategoria)" Title="Nombre de Categoría">
+                <EditTemplate Context="categoria">
+                    <RadzenTextBox @bind-Value="categoria.NombreCategoria" Style="width:100%; display: block" Name="NombreCategoria" />
+                    <RadzenRequiredValidator Text="El nombre es requerido" Component="NombreCategoria" Popup="true" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="@nameof(Categoria.Descripcion)" Title="Descripción">
+                <EditTemplate Context="categoria">
+                    <RadzenTextBox @bind-Value="categoria.Descripcion" Style="width:100%; display: block" Name="Descripcion" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Context="categoria" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+                <Template Context="categoria">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                  Click="@(args => EditRow(categoria))" @onclick:stopPropagation="true" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                  class="rz-ms-1" Click="@(args => DeleteRow(categoria))" @onclick:stopPropagation="true" />
+                </Template>
+                <EditTemplate Context="categoria">
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                  Click="@((args) => SaveRow(categoria))" />
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                  class="rz-ms-1" Click="@((args) => CancelEdit(categoria))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                  class="rz-ms-1" Click="@(args => DeleteRow(categoria))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    List<Categoria>? categorias;
+    RadzenDataGrid<Categoria> categoriasGrid;
+    DataGridEditMode editMode = DataGridEditMode.Single;
+    Categoria categoriaToInsert;
+    Categoria categoriaToUpdate;
+    PagerPosition pagerPosition = PagerPosition.Bottom;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategorias();
+    }
+
+    async Task LoadCategorias()
+    {
+        try
+        {
+            categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias") ?? new List<Categoria>();
+            
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar las categorías: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Error al cargar las categorías: {ex.Message}");
+        }
+    }
+
+    // Pone una fila en modo de edición
+    async Task EditRow(Categoria categoria)
+    {
+        categoriaToUpdate = new Categoria
+            {
+                Id = categoria.Id,
+                NombreCategoria = categoria.NombreCategoria,
+                Descripcion = categoria.Descripcion
+            };
+        await categoriasGrid.EditRow(categoria);
+    }
+
+    // Se dispara cuando se cancela la edición
+    void CancelEdit(Categoria categoria)
+    {
+        if (categoria == categoriaToInsert)
+        {
+            categoriaToInsert = null;
+        }
+        else if (categoriaToUpdate != null)
+        {
+            // Restaurar todos los valores
+            categoria.NombreCategoria = categoriaToUpdate.NombreCategoria;
+            categoria.Descripcion = categoriaToUpdate.Descripcion;
+            categoriaToUpdate = null;
+        }
+        categoriasGrid.CancelEditRow(categoria);
+    }
+
+    // Se dispara para eliminar una fila
+    async Task DeleteRow(Categoria categoria)
+    {
+        // Si es una fila nueva que aún no se ha guardado, solo la quitamos de la vista
+        if (categoria == categoriaToInsert)
+        {
+            categoriaToInsert = null;
+        }
+        else if (categorias.Contains(categoria))
+        {
+            // Pedimos confirmación antes de borrar
+            if (await JSRuntime.InvokeAsync<bool>("confirm", $"¿Estás seguro de que quieres eliminar la categoría '{categoria.NombreCategoria}'?"))
+            {
+                try
+                {
+                    // Llamada a la API para eliminar la categoría
+                    var response = await Http.DeleteAsync($"api/Categorias/{categoria.Id}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        // Recargamos los datos para reflejar el cambio
+                        await LoadCategorias();
+                        await categoriasGrid.Reload();
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Error al eliminar la categoría: {response.StatusCode} - {errorContent}");
+                        await JSRuntime.InvokeVoidAsync("alert", $"Error al eliminar la categoría: {response.StatusCode}. {errorContent}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Excepción al eliminar la categoría: {ex.Message}");
+                    await JSRuntime.InvokeVoidAsync("alert", $"Excepción al eliminar la categoría: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    // Prepara una nueva fila para ser insertada
+    async Task InsertRow()
+    {
+        categoriaToInsert = new Categoria();
+        await categoriasGrid.InsertRow(categoriaToInsert);
+    }
+
+    // Se dispara cuando el usuario hace clic en "check" (guardar) para una fila editada o nueva
+    async Task SaveRow(Categoria categoria)
+    {
+        if (categoria == categoriaToInsert)
+        {
+            // Es una nueva categoría
+            await OnCreateRow(categoria);
+        }
+        else
+        {
+            // Es una categoría existente que se está actualizando
+            await OnUpdateRow(categoria);
+        }
+    }
+
+    // Se dispara cuando el grid crea la nueva fila. Aquí es donde la guardamos en la BBDD.
+    async Task OnCreateRow(Categoria categoria)
+    {
+        try
+        {
+            // Llamada a la API para crear la nueva categoría
+            var response = await Http.PostAsJsonAsync("api/Categorias", categoria);
+            if (response.IsSuccessStatusCode)
+            {
+                categoriaToInsert = null;
+                await LoadCategorias();
+                await categoriasGrid.Reload();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al crear la categoría: {response.StatusCode} - {errorContent}");
+                await JSRuntime.InvokeVoidAsync("alert", $"Error al crear la categoría: {response.StatusCode}. {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excepción al crear la categoría: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Excepción al crear la categoría: {ex.Message}");
+        }
+    }
+
+    // Se dispara cuando el grid actualiza una fila. Aquí es donde la actualizamos en la BBDD.
+    async Task OnUpdateRow(Categoria categoria)
+    {
+        try
+        {
+            // Llamada a la API para actualizar la categoría
+            var response = await Http.PutAsJsonAsync($"api/Categorias/{categoria.Id}", categoria);
+            if (response.IsSuccessStatusCode)
+            {
+                categoriaToUpdate = null;
+                await LoadCategorias();
+                await categoriasGrid.Reload();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al actualizar la categoría: {response.StatusCode} - {errorContent}");
+                await JSRuntime.InvokeVoidAsync("alert", $"Error al actualizar la categoría: {response.StatusCode}. {errorContent}");
+                // Si falla, revertimos los cambios al estado original
+                CancelEdit(categoria);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excepción al actualizar la categoría: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Excepción al actualizar la categoría: {ex.Message}");
+            // Si falla, revertimos los cambios al estado original
+            CancelEdit(categoria);
+        }
+    }
+}

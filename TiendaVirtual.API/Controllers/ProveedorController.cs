@@ -2,15 +2,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NuGet.Protocol;
 using TiendaVirtual.API.Data;
 using TiendaVirtual.API.Models;
 using TiendaVirtual.API.Models.DTOs;
 
 namespace TiendaVirtual.API.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class ProveedorController : ControllerBase
@@ -41,6 +44,31 @@ namespace TiendaVirtual.API.Controllers
             }
 
             return proveedor;
+        }
+
+        // GET: api/Proveedor/1/productos
+        [HttpGet("{id}/productos")]
+        public async Task<ActionResult<IEnumerable<ProveedorProductoViewModel>>> GetProductosPorProveedor(int id)
+        {
+            var productosDelProveedor = await _context.Proveedorproductos
+                .Include(pp => pp.IdProductoNavigation)
+                .Where(pp => pp.IdProveedor == id)
+                .Select(pp => new ProveedorProductoViewModel
+                {
+                    IdProveedor = pp.IdProveedor,
+                    IdProducto = pp.IdProducto,
+                    NombreProducto = pp.IdProductoNavigation.NombreProducto,
+                    ImagenProducto = pp.IdProductoNavigation.Imagen,
+                    NombreEspecifico = pp.NombreEspecifico
+                })
+                .ToListAsync();
+
+
+            if (productosDelProveedor == null)
+            {
+                return NotFound();
+            }
+            return Ok(productosDelProveedor);
         }
 
         // PUT: api/Proveedors/5
@@ -120,5 +148,14 @@ namespace TiendaVirtual.API.Controllers
         {
             return _context.Proveedor.Any(e => e.Id == id);
         }
+    }
+
+    public  class ProveedorProductoViewModel
+    {
+        public int IdProveedor { get; set; }
+        public int IdProducto { get; set; }
+        public string NombreProducto { get; set; }
+        public string ImagenProducto { get; set; }
+        public string NombreEspecifico { get; set; }
     }
 }

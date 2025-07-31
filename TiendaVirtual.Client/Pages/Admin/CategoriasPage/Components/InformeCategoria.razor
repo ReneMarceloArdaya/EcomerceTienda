@@ -1,0 +1,233 @@
+﻿@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@using Models
+@using ClosedXML.Excel
+@using System.IO
+
+
+<h3>Informe de Categorías</h3>
+
+<RadzenButton ButtonStyle="ButtonStyle.Info" Icon="file_download" Text="Exportar a Excel" Click="ExportToExcel" class="rz-mb-3" />
+
+@if (categorias == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <RadzenDataGrid @ref="categoriasGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                    AllowGrouping="true" FilterMode="FilterMode.Advanced"
+                    Data="@categorias" TItem="Categoria" ColumnWidth="200px" PagerPosition="@pagerPosition"
+                    AndOperatorText="Y"
+                    OrOperatorText="O"
+                    ApplyFilterText="Aplicar"
+                    ClearFilterText="Limpiar"
+                    FilterCaseSensitivityText="Distinguir mayúsculas"
+                    ContainsText="Contiene"
+                    DoesNotContainText="No contiene"
+                    StartsWithText="Empieza por"
+                    EndsWithText="Termina en"
+                    EqualsText="Es igual a"
+                    NotEqualsText="No es igual a"
+                    IsNullText="Es nulo"
+                    IsNotNullText="No es nulo"
+                    GreaterThanText="Mayor que"
+                    GreaterThanOrEqualsText="Mayor o igual que"
+                    LessThanText="Menor que"
+                    LessThanOrEqualsText="Menor o igual que"
+                    IsEmptyText="Esta Vacio"
+                    IsNotEmptyText="No esta Vacio"
+                    PageSizeText="Elementos por página"
+                    PagingSummaryFormat="Mostrando página {0} de {1} (total {2} elementos)">
+        <Columns>
+            <RadzenDataGridColumn Property="@nameof(Categoria.Id)" Title="ID" Width="80px" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Categoria.NombreCategoria)" Title="Nombre de Categoría" />
+            <RadzenDataGridColumn Property="@nameof(Categoria.Descripcion)" Title="Descripción" />
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    List<Categoria>? categorias;
+    RadzenDataGrid<Categoria> categoriasGrid;
+    PagerPosition pagerPosition = PagerPosition.Bottom;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategorias();
+    }
+
+    async Task LoadCategorias()
+    {
+        try
+        {
+            categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar las categorías: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Error al cargar las categorías: {ex.Message}");
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (categoriasGrid == null || categorias == null) return;
+
+        try
+        {
+            // 1. Obtener los datos filtrados, ordenados y paginados del View del DataGrid
+            List<Categoria> itemsToExport;
+            try
+            {
+                var viewProperty = categoriasGrid.GetType().GetProperty("View");
+                if (viewProperty != null)
+                {
+                    var viewInstance = viewProperty.GetValue(categoriasGrid);
+                    var dataProperty = viewInstance?.GetType().GetProperty("Data");
+                    var data = dataProperty?.GetValue(viewInstance) as IEnumerable<object>;
+
+                    if (data != null)
+                    {
+                        itemsToExport = data.Cast<Categoria>().ToList();
+                    }
+                    else
+                    {
+                        itemsToExport = categorias.ToList();
+                        await JSRuntime.InvokeVoidAsync("alert", "No se pudo acceder a los datos filtrados. Se exportarán todas las categorías.");
+                    }
+                }
+                else
+                {
+                    itemsToExport = categorias.ToList();
+                    await JSRuntime.InvokeVoidAsync("alert", "No se pudo acceder al View del grid. Se exportarán todas las categorías.");
+                }
+            }
+            catch (Exception ex)
+            {
+                itemsToExport = categorias.ToList();
+                Console.WriteLine($"Advertencia al acceder a View.Data: {ex.Message}. Exportando todos los datos.");
+            }
+
+            if (!itemsToExport.Any())
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "No hay datos para exportar.");
+                return;
+            }
+
+            // 2. Crear el libro de trabajo de Excel
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Informe Categorías");
+
+            // 3. Obtener las columnas visibles definidas en el DataGrid
+            var visibleColumns = categoriasGrid.ColumnsCollection.Where(c => c.Visible && !string.IsNullOrEmpty(c.GetTitle())).ToList();
+
+            // 4. Manejar Agrupaciones
+            var groupDescriptors = categoriasGrid.Groups;
+            int groupLevelCount = groupDescriptors.Count;
+            int currentRow = 1;
+
+            // Escribir encabezados de agrupación (si hay)
+            if (groupLevelCount > 0)
+            {
+                for (int i = 0; i < groupLevelCount; i++)
+                {
+                    var groupDescriptor = groupDescriptors[i];
+                    var groupColumn = visibleColumns.FirstOrDefault(c => c.GetGroupProperty() == groupDescriptor.Property);
+                    string groupTitle = groupColumn?.GetTitle() ?? groupDescriptor.Property;
+
+                    worksheet.Cell(currentRow, i + 1).Value = $"Grupo por: {groupTitle}";
+                    worksheet.Cell(currentRow, i + 1).Style.Font.Bold = true;
+                    worksheet.Cell(currentRow, i + 1).Style.Fill.BackgroundColor = XLColor.LightGray;
+                }
+                currentRow++;
+            }
+
+            // 5. Escribir encabezados de columnas de datos
+            for (int i = 0; i < visibleColumns.Count; i++)
+            {
+                int colIndex = groupLevelCount + i + 1;
+                worksheet.Cell(currentRow, colIndex).Value = visibleColumns[i].GetTitle();
+                worksheet.Cell(currentRow, colIndex).Style.Font.Bold = true;
+                worksheet.Cell(currentRow, colIndex).Style.Fill.BackgroundColor = XLColor.Gray;
+            }
+            int headerRow = currentRow;
+            currentRow++;
+
+            // 6. Escribir datos
+            foreach (var item in itemsToExport)
+            {
+                // Escribir valores de grupo (simplificado)
+                for (int g = 0; g < groupLevelCount; g++)
+                {
+                    var groupDescriptor = groupDescriptors[g];
+                    object groupValue = GetPropertyValue(item, groupDescriptor.Property);
+                    worksheet.Cell(currentRow, g + 1).Value = groupValue?.ToString() ?? "";
+                }
+
+                // Escribir valores de datos
+                for (int i = 0; i < visibleColumns.Count; i++)
+                {
+                    int colIndex = groupLevelCount + i + 1;
+                    var column = visibleColumns[i];
+                    string propertyPath = column.GetFilterProperty();
+
+                    object cellValue = "[No Exportable]";
+                    var value = GetPropertyValue(item, propertyPath);
+
+                    if (value is IFormattable formattable && !string.IsNullOrEmpty(column.FormatString))
+                    {
+                        // Si tuvieras formatos específicos, los aplicarías aquí
+                        // cellValue = formattable.ToString(column.FormatString, System.Globalization.CultureInfo.CurrentCulture);
+                        cellValue = formattable.ToString(); // Formato por defecto
+                    }
+                    else
+                    {
+                        cellValue = value?.ToString() ?? "";
+                    }
+
+                    worksheet.Cell(currentRow, colIndex).Value = cellValue?.ToString() ?? "";
+                }
+                currentRow++;
+            }
+
+            // 7. Aplicar autofiltros
+            var lastColumn = groupLevelCount + visibleColumns.Count;
+            if (lastColumn > 0)
+            {
+                worksheet.Range(worksheet.Cell(headerRow, 1), worksheet.Cell(headerRow, lastColumn)).SetAutoFilter();
+            }
+
+            // 8. Autoajustar columnas
+            worksheet.Columns().AdjustToContents();
+
+            // 9. Guardar y descargar
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var base64 = Convert.ToBase64String(stream.ToArray());
+            await JSRuntime.InvokeVoidAsync("downloadFile", "informe_categorias.xlsx", base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error al exportar a Excel: {ex}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Error al exportar: {ex.Message}");
+        }
+    }
+
+    // Función auxiliar para obtener el valor de una propiedad
+    private object GetPropertyValue(object obj, string propertyPath)
+    {
+        if (obj == null || string.IsNullOrEmpty(propertyPath))
+            return null;
+
+        var propertyInfo = obj.GetType().GetProperty(propertyPath);
+        if (propertyInfo != null)
+        {
+            return propertyInfo.GetValue(obj);
+        }
+        return null;
+    }
+}

@@ -1,0 +1,21 @@
+﻿@page "/admin/categorias"
+@layout AdminLayout
+@using TiendaVirtual.Client.Pages.Admin.CategoriasPage.Components
+
+
+<RadzenTabs TabPosition="@tabPosition" RenderMode="TabRenderMode.Client">
+    <Tabs>
+        <RadzenTabsItem Text="Administracion">
+            <CrudCategorias />
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Reportes">
+            <InformeCategoria />
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+
+@code {
+    TabPosition tabPosition = TabPosition.Top;
+
+}

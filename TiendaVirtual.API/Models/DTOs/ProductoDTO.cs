@@ -11,5 +11,7 @@
         public int? IdCategoria { get; set; }
 
         public string? Imagen { get; set; }
+
+        
     }
 }

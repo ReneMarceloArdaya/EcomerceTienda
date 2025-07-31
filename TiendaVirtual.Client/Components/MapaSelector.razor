@@ -1,0 +1,53 @@
+﻿
+@inject IJSRuntime JSRuntime
+
+<div id="@mapId" style="height: 400px; width: 100%;"></div>
+@if (MostrarCoordenadas)
+{
+    <div style="margin-top: 10px;">
+        <p><strong>Latitud:</strong> @LatitudSeleccionada?.ToString("F6")</p>
+        <p><strong>Longitud:</strong> @LongitudSeleccionada?.ToString("F6")</p>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<(decimal? Latitud, decimal? Longitud)> CoordenadasSeleccionadas { get; set; }
+    [Parameter] public decimal? LatitudInicial { get; set; }
+    [Parameter] public decimal? LongitudInicial { get; set; }
+    [Parameter] public bool MostrarCoordenadas { get; set; } = true;
+
+    private string mapId = $"map-{Guid.NewGuid()}";
+    private DotNetObjectReference<MapaSelector> dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("initializeMap", mapId, LatitudInicial, LongitudInicial, dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnMapClick(double lat, double lng)
+    {
+        await CoordenadasSeleccionadas.InvokeAsync(((decimal?)lat, (decimal?)lng));
+    }
+
+    // Propiedades para mostrar las coordenadas seleccionadas en el componente
+    private decimal? LatitudSeleccionada => LatitudInicial;
+    private decimal? LongitudSeleccionada => LongitudInicial;
+
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("destroyMap", mapId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al destruir el mapa: {ex.Message}");
+        }
+    }
+}

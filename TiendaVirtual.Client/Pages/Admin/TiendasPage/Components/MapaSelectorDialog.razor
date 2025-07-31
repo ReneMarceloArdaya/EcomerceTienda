@@ -1,0 +1,41 @@
+﻿@inject DialogService DialogService
+@using TiendaVirtual.Client.Components
+<h3>Seleccionar Ubicación</h3>
+
+<MapaSelector 
+    LatitudInicial="@Latitud" 
+    LongitudInicial="@Longitud"
+    CoordenadasSeleccionadas="ActualizarCoordenadas" 
+    MostrarCoordenadas="true" />
+
+<RadzenButton Text="Cancelar" Click="@(() => DialogService.Close(null))" ButtonStyle="ButtonStyle.Light" />
+<RadzenButton Text="Aceptar" Click="@Aceptar" ButtonStyle="ButtonStyle.Primary" Style="margin-left:10px;" />
+
+@code {
+    [Parameter] public decimal? Latitud { get; set; }
+    [Parameter] public decimal? Longitud { get; set; }
+
+    private decimal? nuevaLatitud;
+    private decimal? nuevaLongitud;
+
+    void ActualizarCoordenadas((decimal? Lat, decimal? Lng) coords)
+    {
+        nuevaLatitud = coords.Lat;
+        nuevaLongitud = coords.Lng;
+    }
+
+    void Aceptar()
+    {
+        DialogService.Close(new CoordenadasModel
+        {
+            Latitud = nuevaLatitud ?? Latitud,
+            Longitud = nuevaLongitud ?? Longitud
+        });
+    }
+
+    public class CoordenadasModel
+    {
+        public decimal? Latitud { get; set; }
+        public decimal? Longitud { get; set; }
+    }
+}

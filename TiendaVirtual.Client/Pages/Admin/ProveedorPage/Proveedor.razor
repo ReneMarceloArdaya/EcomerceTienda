@@ -1,0 +1,21 @@
+﻿@page "/admin/proveedores"
+@layout AdminLayout
+@using TiendaVirtual.Client.Pages.Admin.ProveedorPage.Components
+
+
+<RadzenTabs TabPosition="@tabPosition" RenderMode="TabRenderMode.Client">
+    <Tabs>
+        <RadzenTabsItem Text="Administracion">
+            <CrudProveedores />
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Reportes">
+            <InformeProveedor />
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+
+@code {
+    TabPosition tabPosition = TabPosition.Top;
+
+}

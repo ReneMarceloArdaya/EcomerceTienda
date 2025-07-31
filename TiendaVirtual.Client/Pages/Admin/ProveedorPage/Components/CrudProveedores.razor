@@ -1,0 +1,339 @@
+﻿@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@using Models
+
+
+<h3>Gestión de Proveedores</h3>
+
+@if (proveedores == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <RadzenDataGrid @ref="proveedoresGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+    Data="@proveedores" TItem="Proveedor" ColumnWidth="200px" PagerPosition="@pagerPosition"
+                    ExpandMode="DataGridExpandMode.Single"
+                    RowExpand="@OnRowExpand"
+                    EditMode="@editMode"
+                    RowUpdate="@OnUpdateRow"
+                    RowCreate="@OnCreateRow"
+                    AndOperatorText="Y"
+                    OrOperatorText="O"
+                    ApplyFilterText="Aplicar"
+                    ClearFilterText="Limpiar"
+                    FilterCaseSensitivityText="Distinguir mayúsculas"
+                    ContainsText="Contiene"
+                    DoesNotContainText="No contiene"
+                    StartsWithText="Empieza por"
+                    EndsWithText="Termina en"
+                    EqualsText="Es igual a"
+                    NotEqualsText="No es igual a"
+                    IsNullText="Es nulo"
+                    IsNotNullText="No es nulo"
+                    GreaterThanText="Mayor que"
+                    GreaterThanOrEqualsText="Mayor o igual que"
+                    LessThanText="Menor que"
+                    LessThanOrEqualsText="Menor o igual que"
+                    IsEmptyText="Esta Vacio"
+                    IsNotEmptyText="No esta Vacio"
+                    PageSizeText="Elementos por página"
+                    PagingSummaryFormat="Mostrando página {0} de {1} (total {2} elementos)">
+        <Template Context="proveedor">
+            <div class="rz-p-4">
+                <h5>Productos suministrados por: @proveedor.NombreProveedor</h5>
+                <RadzenDataGrid @ref="@(productosGrids[proveedor.Id])" Data="@(productosPorProveedor.GetValueOrDefault(proveedor.Id, new List<ProveedorProductoViewModel>()))" 
+                                TItem="ProveedorProductoViewModel"
+                                AllowSorting="true" AllowPaging="true" PageSize="5"
+                                EditMode="DataGridEditMode.Single" RowUpdate="@OnProductoProveedorUpdate">
+                    <Columns>
+                        <RadzenDataGridColumn Property="@nameof(ProveedorProductoViewModel.IdProducto)" Title="ID Prod." Width="80px" />
+                        <RadzenDataGridColumn Title="Imagen" Sortable="false" Filterable="false" Width="80px">
+                            <Template Context="prodInfo">
+                                @if (!string.IsNullOrEmpty(prodInfo.ImagenProducto))
+                                {
+                                    <RadzenImage Path="@prodInfo.ImagenProducto" style="width: 40px; height: 40px; border-radius: 8px;" AlternateText="@(prodInfo.NombreProducto)" />
+                                }
+                                else
+                                {
+                                    <RadzenIcon Icon="image" Style="font-size: 20px; color: #ccc;" />
+                                }
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn Property="@nameof(ProveedorProductoViewModel.NombreProducto)" Title="Producto" />
+                        <RadzenDataGridColumn Property="@nameof(ProveedorProductoViewModel.NombreEspecifico)" Title="Nombre Específico">
+                            <EditTemplate Context="prodInfo">
+                                <RadzenTextBox @bind-Value="prodInfo.NombreEspecifico" Style="width:100%" Name="@GetValidatorName(prodInfo.IdProducto)" />
+                                <RadzenRequiredValidator Text="El nombre específico es requerido" Component="@GetValidatorName(prodInfo.IdProducto)" Popup="true" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn Context="prodInfo" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="80px">
+                            <Template Context="prodInfo">
+                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                                Click="@(args => productosGrids[proveedor.Id].EditRow(prodInfo))" @onclick:stopPropagation="true" />
+                            </Template>
+                            <EditTemplate Context="prodInfo">
+                                <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" 
+                                Click="@(args => productosGrids[proveedor.Id].UpdateRow(prodInfo))" />
+                                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="rz-ms-1" 
+                                Click="@(args => productosGrids[proveedor.Id].CancelEditRow(prodInfo))" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </div>
+        </Template>
+        <HeaderTemplate>
+            <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle" Text="Añadir Nuevo Proveedor" Click="@InsertRow" Disabled="@(proveedorToInsert != null)" />
+        </HeaderTemplate>
+        <Columns>
+            <RadzenDataGridColumn Property="@nameof(Proveedor.Id)" Title="ID" Width="80px" TextAlign="TextAlign.Center" Filterable="false" />
+            <RadzenDataGridColumn Property="@nameof(Proveedor.NombreProveedor)" Title="Nombre del Proveedor">
+                <EditTemplate Context="proveedor">
+                    <RadzenTextBox @bind-Value="proveedor.NombreProveedor" Style="width:100%; display: block" Name="NombreProveedor" />
+                    <RadzenRequiredValidator Text="El nombre es requerido" Component="NombreProveedor" Popup="true" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="@nameof(Proveedor.Direccion)" Title="Dirección">
+                <EditTemplate Context="proveedor">
+                    <RadzenTextBox @bind-Value="proveedor.Direccion" Style="width:100%; display: block" Name="Direccion" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="@nameof(Proveedor.Telefono)" Title="Teléfono">
+                <EditTemplate Context="proveedor">
+                    <RadzenTextBox @bind-Value="proveedor.Telefono" Style="width:100%; display: block" Name="Telefono" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Context="proveedor" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+                <Template Context="proveedor">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                    Click="@(args => EditRow(proveedor))" @onclick:stopPropagation="true" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                    class="rz-ms-1" Click="@(args => DeleteRow(proveedor))" @onclick:stopPropagation="true" />
+                </Template>
+                <EditTemplate Context="proveedor">
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                    Click="@((args) => SaveRow(proveedor))" />
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                    class="rz-ms-1" Click="@((args) => CancelEdit(proveedor))" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                    class="rz-ms-1" Click="@(args => DeleteRow(proveedor))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    List<Proveedor>? proveedores;
+    Dictionary<int, List<ProveedorProductoViewModel>> productosPorProveedor = new();
+    Dictionary<int, RadzenDataGrid<ProveedorProductoViewModel>> productosGrids = new();
+    
+    RadzenDataGrid<Proveedor> proveedoresGrid;
+    DataGridEditMode editMode = DataGridEditMode.Single;
+    Proveedor proveedorToInsert;
+    Proveedor proveedorToUpdate;
+    PagerPosition pagerPosition = PagerPosition.Bottom;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProveedores();
+    }
+
+    private string GetValidatorName(int idProducto)
+    {
+        return $"NombreEspecifico_{idProducto}";
+    }
+
+    async Task LoadProveedores()
+    {
+        try
+        {
+            proveedores = await Http.GetFromJsonAsync<List<Proveedor>>("api/Proveedor");
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar los proveedores: {ex.Message}");
+            
+        }
+    }
+
+    async Task OnRowExpand(Proveedor proveedor)
+    {
+        // Si los datos de productos para este proveedor aún no se han cargado
+        if (!productosPorProveedor.ContainsKey(proveedor.Id) || productosPorProveedor[proveedor.Id] == null)
+        {
+            try
+            {
+                // Hacemos la llamada al endpoint para obtener los productos del proveedor
+                var productosInfo = await Http.GetFromJsonAsync<List<ProveedorProductoViewModel>>($"api/Proveedor/{proveedor.Id}/productos");
+                productosPorProveedor[proveedor.Id] = productosInfo ?? new List<ProveedorProductoViewModel>();
+                StateHasChanged(); // Forzamos la actualización de la UI
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al cargar los productos del proveedor {proveedor.Id}: {ex.Message}");
+                
+            }
+        }
+    }
+
+    async Task OnProductoProveedorUpdate(ProveedorProductoViewModel prodInfo)
+    {
+        try
+        {
+            // Llamada al endpoint para actualizar la relación ProveedorProducto
+            // Asumimos un endpoint PUT en api/ProveedorProducto
+            var response = await Http.PutAsJsonAsync("api/ProveedorProducto", prodInfo);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al actualizar el nombre específico: {response.StatusCode} - {errorContent}");
+                
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al actualizar el nombre específico: {ex.Message}");
+           
+        }
+    }
+
+    // --- Métodos CRUD para Proveedor ---
+    
+    async Task EditRow(Proveedor proveedor)
+    {
+        proveedorToUpdate = new Proveedor
+            {
+                Id = proveedor.Id,
+                NombreProveedor = proveedor.NombreProveedor,
+                Direccion = proveedor.Direccion,
+                Telefono = proveedor.Telefono
+            };
+        await proveedoresGrid.EditRow(proveedor);
+    }
+
+    void CancelEdit(Proveedor proveedor)
+    {
+        if (proveedor == proveedorToInsert)
+        {
+            proveedorToInsert = null;
+        }
+        else if (proveedorToUpdate != null)
+        {
+            proveedor.NombreProveedor = proveedorToUpdate.NombreProveedor;
+            proveedor.Direccion = proveedorToUpdate.Direccion;
+            proveedor.Telefono = proveedorToUpdate.Telefono;
+            proveedorToUpdate = null;
+        }
+        proveedoresGrid.CancelEditRow(proveedor);
+    }
+
+    async Task DeleteRow(Proveedor proveedor)
+    {
+        if (proveedor == proveedorToInsert)
+        {
+            proveedorToInsert = null;
+        }
+        else if (proveedores.Contains(proveedor))
+        {
+            if (await JSRuntime.InvokeAsync<bool>("confirm", $"¿Estás seguro de que quieres eliminar el proveedor '{proveedor.NombreProveedor}'?"))
+            {
+                try
+                {
+                    var response = await Http.DeleteAsync($"api/Proveedore/{proveedor.Id}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        await LoadProveedores();
+                        await proveedoresGrid.Reload();
+                        // Limpiar datos de productos cacheados si existen
+                        productosPorProveedor.Remove(proveedor.Id);
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Error al eliminar el proveedor: {response.StatusCode} - {errorContent}");
+                       
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Excepción al eliminar el proveedor: {ex.Message}");
+                    
+                }
+            }
+        }
+    }
+
+    async Task InsertRow()
+    {
+        proveedorToInsert = new Proveedor();
+        await proveedoresGrid.InsertRow(proveedorToInsert);
+    }
+
+    async Task SaveRow(Proveedor proveedor)
+    {
+        if (proveedor == proveedorToInsert)
+        {
+            await OnCreateRow(proveedor);
+        }
+        else
+        {
+            await OnUpdateRow(proveedor);
+        }
+    }
+
+    async Task OnCreateRow(Proveedor proveedor)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/Proveedor", proveedor);
+            if (response.IsSuccessStatusCode)
+            {
+                proveedorToInsert = null;
+                await LoadProveedores();
+                await proveedoresGrid.Reload();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al crear el proveedor: {response.StatusCode} - {errorContent}");
+                
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excepción al crear el proveedor: {ex.Message}");
+            
+        }
+    }
+
+    async Task OnUpdateRow(Proveedor proveedor)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/Proveedor/{proveedor.Id}", proveedor);
+            if (response.IsSuccessStatusCode)
+            {
+                proveedorToUpdate = null;
+                await LoadProveedores();
+                await proveedoresGrid.Reload();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al actualizar el proveedor: {response.StatusCode} - {errorContent}");
+                
+                CancelEdit(proveedor); // Revertir cambios
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excepción al actualizar el proveedor: {ex.Message}");
+            
+            CancelEdit(proveedor); // Revertir cambios
+        }
+    }
+}

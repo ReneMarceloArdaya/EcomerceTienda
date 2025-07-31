@@ -5,6 +5,7 @@
 @using ClosedXML.Excel
 @using System.IO
 
+
 <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="file_download" Text="Exportar a Excel" Click="ExportToExcel" class="rz-mb-3" />
 
 <RadzenDataGrid @ref="productosGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
@@ -91,11 +92,13 @@
     async Task LoadProductos()
     {
         productos = await Http.GetFromJsonAsync<List<Producto>>("api/Producto");
+        
     }
 
     async Task LoadCategorias()
     {
         categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias");
+       
     }
 
     private async Task ExportToExcel()

@@ -34,9 +34,37 @@ namespace TiendaVirtual.API.Controllers
 
         // GET: api/Producto
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Producto>>> GetProductos()
+        public async Task<ActionResult<IEnumerable<Producto>>> GetProductos([FromQuery] string? include)
         {
-            return await _context.Productos.ToListAsync();
+            // Comenzamos con la consulta base de Productos
+            IQueryable<Producto> query = _context.Productos;
+
+            // Verificar si se solicitó incluir proveedores
+            // Esta lógica permite futuras expansiones (ej. ?include=proveedores,stock)
+            if (!string.IsNullOrWhiteSpace(include))
+            {
+                var includes = include.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                      .Select(i => i.Trim().ToLowerInvariant());
+
+                // Si "proveedores" está en la lista de includes, cargamos los datos relacionados
+                if (includes.Contains("proveedores"))
+                {
+                    query = query.Include(p => p.Proveedorproductos)
+                        .ThenInclude(pp => pp.IdProveedorNavigation);
+                }
+
+            }
+
+            try
+            { 
+                var productos = await query.ToListAsync();
+                return Ok(productos); 
+            }
+            catch (Exception ex)
+            {
+                // Manejo básico de errores
+                return StatusCode(500, $"Error interno del servidor al obtener productos: {ex.Message}");
+            }
         }
 
         // GET: api/Producto/5
@@ -78,6 +106,10 @@ namespace TiendaVirtual.API.Controllers
 
             return stockInfo;
         }
+
+        
+
+
 
         // PUT: api/Producto/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754

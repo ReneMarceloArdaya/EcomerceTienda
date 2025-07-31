@@ -2,6 +2,7 @@
 @using Models
 @using System.Globalization
 
+
 <PageTitle>Información General</PageTitle>
 
 <RadzenText Text="Resumen del Inventario" TextStyle="TextStyle.H4" TagName="TagName.H1" class="rz-mb-4" />
@@ -146,9 +147,18 @@ else
         }
     }
 
-    private async Task LoadProductos() => productos = await Http.GetFromJsonAsync<List<Producto>>("api/Producto") ?? new();
-    private async Task LoadCategorias() => categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias") ?? new();
-    private async Task LoadProductoTiendas() => productoTiendas = await Http.GetFromJsonAsync<List<ProductoTienda>>("api/ProductoTiendas") ?? new();
+    private async Task LoadProductos()
+    {
+        productos = await Http.GetFromJsonAsync<List<Producto>>("api/Producto") ?? new List<Producto>();
+    }
+    private async Task LoadCategorias()
+    {
+        categorias = await Http.GetFromJsonAsync<List<Categoria>>("api/Categorias") ?? new List<Categoria>();
+    }
+    private async Task LoadProductoTiendas()
+    {
+        productoTiendas = await Http.GetFromJsonAsync<List<ProductoTienda>>("api/ProductoTiendas") ?? new List<ProductoTienda>();
+    }
 
     private void CalculateMetrics()
     {
